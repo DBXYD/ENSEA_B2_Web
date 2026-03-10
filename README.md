@@ -94,7 +94,7 @@ Pour commencer le développement de votre application Django, suivez ces étapes
 
 2. **Cloner le repository** : Sur votre machine, ouvrez un terminal et exécutez `git clone <URL-du-repo>`. Cela créera un dossier local synchronisé avec GitHub.
 
-3. **Créer un environnement virtuel Python (venv)** : Un environnement virtuel isole les dépendances de votre projet, évitant les conflits avec d'autres projets Python. Dans le dossier cloné, exécutez `python -m venv venv` pour créer le venv nommé "venv".
+3. **Créer un environnement virtuel Python (venv)** : Un environnement virtuel isole les dépendances de votre projet, évitant les conflits avec d'autres projets Python. Dans le dossier cloné, exécutez `python3 -m venv venv` pour créer le venv nommé "venv".
 
 4. **Script bash pour initialiser le projet Django** : Voici un script à exécuter dans le **terminal (ctrl+alt+t)** après avoir activé le venv avec `source venv/bin/activate` :
 
