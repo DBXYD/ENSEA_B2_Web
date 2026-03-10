@@ -63,7 +63,7 @@ Au lieu d'utiliser l'URL HTTPS, vous pouvez configurer SSH pour une synchronisat
    ```bash
    cat ~/.ssh/id_ed25519.pub
    ```
-   Copiez la sortie (elle commence par `ssh-ed25519`).
+   Après avoir exécuté cette commande, la clé publique s'affichera dans le terminal. Sélectionnez et copiez toute la ligne (elle commence par `ssh-ed25519`). Vous l'ajouterez ensuite sur GitHub.
 
 1. **Ajouter la clé à GitHub** : 
    - Allez dans vos paramètres GitHub (cliquez sur votre avatar > Settings > SSH and GPG keys).
