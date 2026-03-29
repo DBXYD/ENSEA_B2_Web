@@ -627,14 +627,15 @@ Incluez-le dans `{% block extra_js %}`.
 - Comment Django gère-t-il les fichiers statiques en développement vs production ?
 - Pourquoi est-il important de placer les images dans le bon dossier ?
 
-## Etape 7 : Principe d'authentification, intégration du CAS ENSEA
+## Etape 7 : Plug-in Django
 
+### Principe d'authentification, intégration du CAS ENSEA
 Django fournit un système d'authentification intégré. Pour l'ENSEA, nous intégrerons le CAS (Central Authentication Service). Ainsi tous les utilisateurs pourront avoir accès à votre application sans devoir les créer à la main.
 
 **Qu'est-ce qu'un serveur CAS ?**  
 CAS (Central Authentication Service) est un protocole d'authentification unique (Single Sign-On) qui permet aux utilisateurs de se connecter une fois et d'accéder à plusieurs applications sans se reconnecter. Le serveur CAS gère l'authentification centralisée, vérifie les identifiants, et délivre des tickets pour autoriser l'accès aux services. Pour l'ENSEA, il utilise les comptes étudiants au format "4 lettres du prénom + 4 lettres du nom + 2 chiffres".
 
-### Authentification de base
+#### Authentification de base
 - Utilisez `django.contrib.auth` pour les utilisateurs.
 - Créez des vues de login/logout avec `LoginView` et `LogoutView`.
 - Protégez les vues avec `@login_required`.
@@ -650,10 +651,7 @@ def student_list(request):
     ...
 ```
 
-### Intégration CAS
-
-
-
+#### Intégration CAS
 Depuis votre environnement, installez `django-cas-ng` :
 
 ```bash
@@ -692,6 +690,22 @@ Cela permet l'authentification via le CAS de l'ENSEA.
 
 L'évolution de ce plugin est assez rapide, il se peut que cette configuration ne suffise pas, il faudrait éventuellement la compléter. N'hésiter pas à fouiller le web et la documentation officiel Django. Si le problème persiste, appelez votre enseignant.
 
+### Import/export en masse : Django import-export
+Le plugin `django-import-export` permet d'importer/exporter des données en CSV, XLS, etc.
+- Depuis votre environnement, installez : `pip install django-import-export`.
+- Dans `settings.py` : Ajoutez `'import_export'` à `INSTALLED_APPS`.
+- Dans `admin.py`, modifier de la façon suivante votre code pour permettre l'accès au plugin d'import-export à vos modèles  :
+
+```python
+from import_export.admin import ImportExportModelAdmin
+from .models import Student
+
+@admin.register(Student)
+class StudentAdmin(ImportExportModelAdmin):
+    pass
+```
+
+Cela ajoute des boutons Import/Export dans l'admin pour gérer les données en masse.
 
 ## Etape 8 : Compréhension de la stack TCP/IP
 
@@ -2437,14 +2451,168 @@ C'est extrêmement puissant : Vous comprenez maintenant peu HTTP fonctionne vrai
 - `localhost` : 127.0.0.1, accès local.
 - `ALLOWED_HOSTS` : Dans `settings.py`, listez les hôtes autorisés (ex. : ['localhost', '192.168.1.1']).
 
+## Etape 11 : Mise en place d'une API
+### Notion d'API
 
+Une API transforme votre application en un service que d'autres applications peuvent utiliser. Plutôt que de servir uniquement des pages HTML, votre projet peut partager des données et des fonctionnalités avec des clients externes :
+- une application mobile,
+- un front-end JavaScript séparé,
+- un service partenaire,
+- un script automatisé.
 
-<!-- 
-## Etape 8 : Déploiement sur un serveur, manipulations à faire, sécurisation
+L'idée clé est de permettre à des applications tierces de consommer votre application via HTTP. Vous partagez des ressources comme des étudiants, des menus ou des commandes, sans obliger l'utilisateur à passer par l'interface web.
 
-Pour déployer en production :
+### JSON, le format des API
 
-Docker permet de conteneuriser l'application pour un déploiement facile.
+JSON est le format standard des API REST : léger, lisible et supporté par tous les langages.
+
+Exemple :
+
+```json
+{
+  "id": 3,
+  "name": "Charlie",
+  "email": "charlie@ensea.fr"
+}
+```
+
+Exemple de JSON imbriqué :
+
+```json
+{
+  "id": 3,
+  "name": "Charlie",
+  "email": "charlie@ensea.fr",
+  "address": {
+    "street": "12 rue de la Paix",
+    "city": "Paris",
+    "zip": "75001"
+  },
+  "courses": [
+    {"code": "CS101", "name": "Programmation"},
+    {"code": "DB201", "name": "Bases de données"}
+  ]
+}
+```
+
+Pour les API Django, on renvoie généralement du JSON avec l'en-tête `Content-Type: application/json`.
+
+### Modifications de urls.py et views.py
+
+Pour créer une API propre et réutilisable, la meilleure extension Django est `Django REST Framework` (`djangorestframework`).
+
+`REST` signifie « Representational State Transfer ». C'est un style d'architecture pour les API HTTP où chaque ressource est accessible via une URL et où les méthodes HTTP (GET, POST, PUT, DELETE) décrivent l'action à effectuer.
+
+La `sérialisation` consiste à convertir des objets Python/Django en un format transportable comme JSON, puis à retransformer les données JSON reçues en objets Python pour les traiter. DRF (Django REST Framework) automatise cette conversion pour les modèles, les vues et les routes.
+
+Installation :
+
+```bash
+pip install djangorestframework
+```
+
+Dans `settings.py` :
+
+```python
+INSTALLED_APPS = [
+    # ...
+    'rest_framework',
+]
+```
+
+Puis créez un serializer et un viewset :
+
+`serializers.py`
+```python
+from rest_framework import serializers
+from .models import Student
+
+class StudentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Student
+        fields = '__all__'
+```
+
+`views.py`
+```python
+from rest_framework import viewsets
+from .models import Student
+from .serializers import StudentSerializer
+
+class StudentViewSet(viewsets.ModelViewSet):
+    queryset = Student.objects.all()
+    serializer_class = StudentSerializer
+```
+
+`urls.py`
+```python
+from rest_framework.routers import DefaultRouter
+from . import views
+
+router = DefaultRouter()
+router.register(r'students', views.StudentViewSet)
+
+urlpatterns = [
+    # autres urls...
+] + router.urls
+```
+
+Avec ce router, Django REST Framework génère automatiquement les endpoints CRUD pour `/api/students/` et `/api/students/<id>/`.
+
+### Tests de l'API
+
+Pour tester l'API, vous pouvez utiliser `curl` :
+
+```bash
+curl http://localhost:8000/api/students/
+```
+
+Pour une expérience plus agréable sous Firefox, utilisez l'extension `RESTED` :
+- installez `RESTED` depuis les modules complémentaires Firefox,
+- envoyez des requêtes GET, POST, PUT, DELETE,
+- inspectez les réponses JSON et les en-têtes HTTP.
+
+`RESTED` facilite les tests de votre API localement sans quitter le navigateur.
+
+### Automatisation avec une extension Django
+
+La meilleure extension pour automatiser une API Django est `Django REST Framework`.
+
+DRF vous permet de :
+- sérialiser automatiquement les modèles,
+- utiliser des viewsets génériques,
+- générer des routes avec un router,
+- obtenir une API navigable et réutilisable.
+
+En installant `djangorestframework` et en ajoutant `rest_framework` à `INSTALLED_APPS`, vous automatisez la création de votre API et simplifiez le partage de votre application avec des applications tierces.
+
+### Exercice : API des transactions
+
+Proposez une API `transactions` qui retourne les consommations jour par jour pour une période donnée.
+
+- Exposez un endpoint `/api/transactions/` pour récupérer toutes les transactions.
+- Ajoutez un filtre possible sur la plage de dates : `?start=2026-03-01&end=2026-03-07`.
+- Ajoutez un endpoint ou une vue annexe `/api/transactions/daily/` qui renvoie un résumé jour par jour :
+
+```json
+[
+  {"date": "2026-03-01", "total_amount": 123.45},
+  {"date": "2026-03-02", "total_amount": 98.70}
+]
+```
+
+Cet exercice permet de tester l'API de transactions en affichant les consommations quotidiennes et en vérifiant que les données peuvent être groupées et agrégées par date.
+
+<!-- ## Etape 9 : Déploiement sur un serveur, manipulations à faire, sécurisation
+
+Pour déployer en production : **Docker** permet de conteneuriser l'application pour un déploiement facile.
+
+Docker est un outil de virtualisation légère. Il emballe l'application et toutes ses dépendances dans une image unique, ce qui garantit que le code s'exécute de la même manière sur votre machine de développement, sur un serveur de test, ou en production. En pratique, on définit un `Dockerfile` qui indique :
+- l'image de base à utiliser (ici Python 3.9),
+- où copier les fichiers de l'application,
+- les commandes d'installation des dépendances,
+- l'exposition du port,
+- la commande de démarrage.
 
 ### Dockerfile
 Créez un `Dockerfile` :
@@ -2530,39 +2698,10 @@ Host: cafeteria.ensea:8000
 **Réponse (204 No Content) :**
 ```
 HTTP/1.1 204 No Content
-```
+``` -->
 
-#### Exercice : Analyser et manipuler des requêtes HTTP brutes avec netcat
 
-**Objectif :** Intercepter une requête HTTP brute, l'analyser, la modifier, et l'utiliser pour interagir avec votre API Django.
-
-**Prerequis :**
-- Django doit tourner : `python manage.py runserver 0.0.0.0:8000`
-- Une API REST est configurée (ex. : `/api/students/`)
-- `netcat` (nc) est installé
-
-### Modifications de urls.py et views.py
-Installez DjanPlugin Django import-export
-
-Le plugin `django-import-export` permet d'importer/exporter des données en CSV, XLS, etc.
-
-Installez : `pip install django-import-export`.
-
-Dans `settings.py` : Ajoutez `'import_export'` à `INSTALLED_APPS`.
-
-Dans `admin.py` :
-
-```python
-from import_export.admin import ImportExportModelAdmin
-from .models import Student
-
-@admin.register(Student)
-class StudentAdmin(ImportExportModelAdmin):
-    pass
-```
-
-Cela ajoute des boutons Import/Export dans l'admin pour gérer les données en masse.
-Dans `settings.py` : Ajoutez `'rest_framework'` à `INSTALLED_APPS`.
+<!-- Dans `settings.py` : Ajoutez `'rest_framework'` à `INSTALLED_APPS`.
 
 Créez des serializers :
 
@@ -2620,8 +2759,8 @@ services:
       POSTGRES_DB: cafeteria
       POSTGRES_USER: user
       POSTGRES_PASSWORD: pass
-```
-
+``` -->
+<!-- 
 Lancez avec `docker-compose up`.
 
 1. **Serveur** : Utilisez un VPS (ex. : DigitalOcean, OVH).
@@ -2637,20 +2776,7 @@ Lancez avec `docker-compose up`.
    - Utilisez HTTPS (Let's Encrypt).
    - Configurez `SECRET_KEY` sécurisée.
    - Limitez `ALLOWED_HOSTS`.
-   - Utilisez un firewall (ufw).
+   - Utilisez un firewall (ufw). -->
 
-## Etape 9 : Conteneurisation Docker et docker-compose
+<!-- ## Etape 9 : Conteneurisation Docker et docker-compose -->
 
-## Etape 10 : Test utilisateur
-
-## Etape 11 : Mise en place d'une API
-### Notion d'API
-
-### JSON, le format des API
-
-### Modifications de urls.py et views.py
-
-### Tests de l'API
-
-## Etape 12 : plugin Django
-import-export -->
